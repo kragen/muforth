@@ -80,7 +80,7 @@ void mu_shift_right()
 void mu_shift_right_unsigned()
 {
     cell_t sh = POP;
-    (unsigned) TOP >>= sh;
+    TOP = (unsigned)TOP >> sh;
 }
 
 void mu_fetch()

@@ -30,33 +30,34 @@
 VERSION = 0.01
 
 CFLAGS=-O2 -Wall -fomit-frame-pointer
-DBGCFLAGS=-O -ggdb -Wall -DDEBUG
 ASFLAGS=-g
 LDFLAGS=
 
 # If any of these files changes, make a new version.h
 VERSOBJS = kernel.o interpret.o compile.o dict.o file.o \
-	 interpreter.o compiler.o library.o debugger.c float.o \
-	 error.o time.o pci.o tty.o select.o sort.o # buf.o
+	error.o time.o pci.o tty.o select.o sort.o \
+	i386.o i386_lib.o # buf.o
 
 ALLOBJS = ${VERSOBJS} muforth.o
-DEPFILES = Makefile muforth.h opcode.h
 
 .PHONY: all clean
 
 all : muforth
 
-${ALLOBJS} : ${DEPFILES}
+${ALLOBJS} : Makefile muforth.h
 
-muforth.o : version.h muforth.h
+muforth.o : version.h
 
 version.h : Makefile ${VERSOBJS}
 #	echo "struct counted_string version = COUNTED_STRING(\"${VERSION}\");" > version.h
 	echo "#define VERSION \"${VERSION}\"" > version.h
 	echo "time_t build_time = `date \"+%s\"`;" >> version.h
 
-muforth : ${ALLOBJS} ${DEPFILES}
-	${CC} ${LDFLAGS} ${CFLAGS} -o $@ ${ALLOBJS} ${LIBS}
+muforth : ${ALLOBJS}
+	${CC} ${LDFLAGS} -o $@ ${ALLOBJS} ${LIBS}
+
+.gdbinit :
+	ln -s gdb-i386.init .gdbinit
 
 clean :
-	rm -f muforth version.h *.o
+	rm -f muforth .gdbinit version.h *.o

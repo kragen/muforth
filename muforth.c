@@ -33,14 +33,6 @@
 cell_t stack[STACK_SIZE];
 cell_t *sp = S0;
 
-/* return stack */
-cell_t rstack[STACK_SIZE];
-cell_t *rsp = R0;
-
-/* debugger stacks */
-cell_t dbg_stack[STACK_SIZE];
-cell_t dbg_rstack[STACK_SIZE];
-
 int  cmd_line_argc;
 char **cmd_line_argv;
 
@@ -52,7 +44,6 @@ code_t  *pcd;
 
 /* XXX: Gross hack alert! */
 char *ate_the_stack;
-char *ate_the_rstack;
 char *isnt_defined;
 char *version;
 
@@ -92,7 +83,7 @@ static void allocate()
     pnm0 = (uint8_t *) mmap(0, 256 * 4096, PROT_READ | PROT_WRITE,
 			  MAP_ANON | MAP_PRIVATE, -1, 0);
 
-    pcd0 = (code_t *)  mmap(0, PCD_SIZE, PROT_READ | PROT_WRITE | PROT_EXEC,
+    pcd0 = (code_t *)  mmap(0, 256 * 4096, PROT_READ | PROT_WRITE | PROT_EXEC,
 			  MAP_ANON | MAP_PRIVATE, -1, 0);
 
     pdt0 = (uint8_t *) mmap(0, 1024 * 4096, PROT_READ | PROT_WRITE,
@@ -116,7 +107,6 @@ static void allocate()
 static void make_constant_strings()
 {
     ate_the_stack = to_counted_string("ate the stack");
-    ate_the_rstack = to_counted_string("ate the return stack");
     isnt_defined =  to_counted_string("isn't defined");
     version =  to_counted_string(VERSION);
 }
@@ -183,28 +173,18 @@ void mu_push_build_time()
     PUSH(build_time);
 }
 
-static void verify(void)
+static void verify_types(void)
 {
-    int err = 0;
+    if (sizeof(cell_t) != sizeof(void *))
+	die("the size of a cell must be the same size as a pointer");
 
-    if (sizeof(cell_t) != sizeof(void *)) {
-	fprintf(stderr, "ERROR: muForth requires that the size of a cell is the same size as a pointer.\n");
-	err = 1;
-    }
-
-    if (2*sizeof(cell_t) != sizeof(dcell_t)) {
-	fprintf(stderr, "ERROR: muForth requires that the size of a dcell is twice the size of a cell.\n");
-	err = 1;
-    }
-
-    if (err) {
-	exit(-1);
-    }
+    if (2*sizeof(cell_t) != sizeof(dcell_t))
+	die("the size of a dcell must be is twice the size of a cell");
 }
 
 int main(int argc, char *argv[])
 {
-    verify();
+    verify_types();
     allocate();
     init_dict();
     convert_command_line(argc, argv);

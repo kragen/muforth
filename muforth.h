@@ -24,42 +24,16 @@
 #include <sys/types.h>
 #include <string.h>
 
-/*
- * Multi-architecture support
- *
- * We need #defines for things that vary among the architectures that
- * muforth compiles on. Although so far the two architectures supported are
- * both 32 bits, this may change.
- */
-#ifdef __APPLE__
-typedef unsigned char uint8_t;
-typedef unsigned int  uint32_t;
-#endif /* __APPLE__ */
-#ifdef __linux__
-typedef u_int8_t uint8_t;
-typedef u_int16_t uint16_t;
-typedef u_int32_t uint32_t;
-#endif /* __linux__ */
-
-/*
- * You can select double or float for the muForth floating point type.
- * Simply replace "double" with "float", below.
- */
-typedef double  float_t;
-#define FLOAT_NCELLS		(sizeof(float_t) / sizeof(cell_t))
-#define D_NCELLS		2
-typedef long long dcell_t;
-typedef int cell_t;
-typedef unsigned int ucell_t;
-typedef unsigned int code_t;
+typedef int32_t		cell_t;
+typedef int64_t		dcell_t;
+typedef u_int8_t	code_t;
+#define CELL_BYTES	4
+#define CELL_BITS	32
 
 /* data stack */
 #define STACK_SIZE 4096
 #define STACK_SAFETY 256
-#define S0	&stack[STACK_SIZE - STACK_SAFETY]
-#define R0	&rstack[STACK_SIZE - STACK_SAFETY]
-#define dbg_S0	&dbg_stack[STACK_SIZE - STACK_SAFETY]
-#define dbg_R0	&dbg_rstack[STACK_SIZE - STACK_SAFETY]
+#define S0 &stack[STACK_SIZE - STACK_SAFETY]
 
 /* gcc generates stupid code using this def'n */
 /* #define PUSH(n) 	(*--sp = (cell_t)(n)) */
@@ -68,13 +42,7 @@ typedef unsigned int code_t;
 #define STK(n)  	(sp[n])
 #define TOP		STK(0)
 #define DROP(n)		(sp += n)
-#define EXECUTE		(execute(POP))
-
-#define RPUSH(n)	(rsp[-1] = (cell_t)(n), --rsp)
-#define RPOP		(*rsp++)
-#define RSTK(n)  	(rsp[n])
-#define RTOP		RSTK(0)
-#define RDROP(n)	(rsp += n)
+#define EXECUTE		(*(void (*)()) POP)()
 
 #ifdef DEBUG
 #include <stdio.h>
@@ -123,15 +91,9 @@ extern struct string parsed;	/* for errors */
 
 extern cell_t stack[];
 extern cell_t *sp;
-extern cell_t rstack[];
-extern cell_t *rsp;
-extern cell_t dbg_stack[];
-extern cell_t dbg_rstack[];
 
 extern int  cmd_line_argc;
 extern char **cmd_line_argv;
-
-#define PCD_SIZE		(256 * 4096)
 
 extern uint8_t *pnm0, *pdt0;	/* ptrs to name & data spaces */
 extern code_t  *pcd0;		/* ptr to code space */
@@ -145,7 +107,6 @@ extern void (*mu_name_hook)();		/* called when a name is created */
 
 /* XXX: Gross hack alert! */
 extern char *ate_the_stack;
-extern char *ate_the_rstack;
 extern char *isnt_defined;
 extern char *version;
 
@@ -176,24 +137,24 @@ void mu_readable_q();
 void mu_read_carefully(void);  /* XXX: temporary */
 void mu_write_carefully(void); /* XXX: temporary */
 
-
-/* compiler.c */
+/* i386.c */
+void mu_push_cell_size(void);
+void mu_push_cell_bits(void);
 void mu_compile_call(void);
 void mu_resolve(void);
+void mu_compile_jump(void);
+void mu_compile_entry(void);
 void mu_compile_exit(void);
 void mu_compile_drop(void);
 void mu_compile_2drop(void);
 void mu_compile_literal_load(void);
 void mu_compile_literal_push(void);
-void mu_compile_fliteral_load(void);
-void mu_compile_fliteral_push(void);
 void mu_fetch_literal_value(void);
 void mu_compile_destructive_zbranch();
 void mu_compile_nondestructive_zbranch();
 void mu_compile_branch(void);
 void mu_compile_push_to_r(void);
 void mu_compile_2push_to_r(void);
-void mu_compile_execute(void);
 void mu_compile_shunt(void);
 void mu_compile_pop_from_r(void);
 void mu_compile_2pop_from_r(void);
@@ -201,37 +162,17 @@ void mu_compile_copy_from_r(void);
 void mu_compile_qfor(void);
 void mu_compile_next(void);
 
-/* interpreter.c */
-void execute(cell_t target);
-
-/* library.c */
-dcell_t dpop(void);
-void dpush(dcell_t);
-float_t fpop(void);
-void fpush(float_t);
-
+/* i386.s */
+void mu_push_literal(void);
 void mu_dplus(void);
 void mu_dnegate(void);
 void mu_um_star(void);
 void mu_m_star(void);
 void mu_um_slash_mod(void);
 void mu_fm_slash_mod(void);
-
-/* float.c */
-void mu_fdot(void);
-void mu_d_to_f(void);
-void mu_f_to_d(void);
-void mu_fadd(void);
-void mu_fdiv(void);
-void mu_fmul(void);
-void mu_fneg(void);
-void mu_fdot(void);
-void mu_str_to_f(void);
+void mu_jump(void);
 
 /* interpret.c */
-void mu_push_cell_size(void);
-void mu_push_cell_bits(void);
-void mu_push_fcell_size(void);
 void mu_start_up(void);
 void mu_nope(void);
 void mu_zzz(void);
@@ -239,6 +180,7 @@ void mu_token(void);
 void mu_parse(void);
 void mu_huh(void);
 void mu_complain(void);
+void mu_depth(void);
 void mu_interpret(void);
 void mu_evaluate(void);
 void mu_push_tick_number(void);
@@ -258,12 +200,6 @@ void mu_scrabble(void);
 void mu_colon(void);
 void mu_semicolon(void);
 char *to_counted_string(char *);
-
-/* debugger.c */
-void mu_debugger(void);
-void mu_dbg(void);
-void mu_disassemble(void);
-void mu_print_stacks(void);
 
 /* dict.c */
 void mu_definitions(void);
@@ -293,11 +229,11 @@ void mu_shift_right(void);
 void mu_shift_right_unsigned(void);
 void mu_fetch(void);
 void mu_cfetch(void);
-void mu_ffetch(void);
 void mu_store(void);
 void mu_cstore(void);
-void mu_fstore(void);
 void mu_plus_store(void);
+void mu_drop(void);
+void mu_two_drop(void);
 void mu_rot(void);
 void mu_minus_rot(void);
 void mu_dupe(void);
@@ -315,8 +251,6 @@ void mu_less(void);
 void mu_sp_fetch(void);
 void mu_sp_store(void);
 void mu_cmove(void);
-void mu_dplus_gcc(void);
-void mu_dnegate_gcc(void);
 
 /* time.c */
 void mu_local_time(void);

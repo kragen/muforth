@@ -281,7 +281,7 @@ void mu__lbracket()
 	EXECUTE;
 	return;
     }
-    execute((cell_t) mu_number);
+    (*mu_number)();
 }
 
 /* The compiler's "consume" function. */
@@ -301,7 +301,7 @@ void mu__rbracket()
 	mu_compile_call();
 	return;
     }
-    execute((cell_t) mu_number_comma);
+    (*mu_number_comma)();
 }
 
 void mu_nope() {}		/* very useful NO-OP */
@@ -317,21 +317,6 @@ static struct imode forth_interpreter  = { mu__lbracket, mu_nope };
 static struct imode forth_compiler     = { mu__rbracket, mu_nope };
 
 static struct imode *state = &forth_interpreter;
-
-void mu_push_cell_size(void)
-{
-	PUSH(sizeof(cell_t));
-}
-
-void mu_push_fcell_size(void)
-{
-	PUSH(sizeof(float_t));
-}
-
-void mu_push_cell_bits(void)
-{
-	PUSH(sizeof(cell_t) * 8);
-}
 
 void mu_push_state()
 {
@@ -355,30 +340,13 @@ void mu_push_parsed()
     DROP(-2);
 }
 
-static int within_stack(cell_t *sp, cell_t *lo, cell_t *hi)
-{
-	/* The "sp <= hi" is a tough one.  But, with an empty stack
-	 * sp == hi.
-	 */
-	return (sp >= lo && sp <= hi);
-}
-
 static void mu_qstack()
 {
-    if (!within_stack(sp, stack, S0) &&
-	!within_stack(sp, dbg_stack, dbg_S0))
+    if (sp > S0)
     {
 	PUSH(ate_the_stack);
 	mu_throw();
     }
-
-    if (!within_stack(rsp, rstack, R0) &&
-	!within_stack(rsp, dbg_rstack, dbg_R0))
-    {
-	PUSH(ate_the_rstack);
-	mu_throw();
-    }
-
 }
 
 void mu_interpret()
@@ -393,7 +361,7 @@ void mu_interpret()
     {
 	mu_token();
 	if (TOP == 0) break;
-	execute((cell_t) state->eat);	/* consume(); */
+	(*state->eat)();	/* consume(); */
 	mu_qstack();
     }
     DROP(2);
