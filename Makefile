@@ -27,16 +27,15 @@
 ### all the "web projects" stuff. Now it should compile with BSD make or
 ### GNU make.
  
-VERSION = 0.01
+VERSION=	0.01
 
-CFLAGS=-O2 -Wall -fomit-frame-pointer
-ASFLAGS=-g
+CFLAGS=		-O2 -Wall -fomit-frame-pointer
 LDFLAGS=
 
 # If any of these files changes, make a new version.h
-VERSOBJS = kernel.o interpret.o compile.o dict.o file.o \
-	error.o time.o pci.o tty.o select.o sort.o \
-	i386.o i386_lib.o # buf.o
+VERSOBJS=	kernel.o interpret.o compile.o dict.o file.o \
+		error.o time.o pci.o tty.o select.o sort.o \
+		i386.o i386_lib.o # buf.o
 
 ALLOBJS = ${VERSOBJS} muforth.o
 
@@ -49,7 +48,6 @@ ${ALLOBJS} : Makefile muforth.h
 muforth.o : version.h
 
 version.h : Makefile ${VERSOBJS}
-#	echo "struct counted_string version = COUNTED_STRING(\"${VERSION}\");" > version.h
 	echo "#define VERSION \"${VERSION}\"" > version.h
 	echo "time_t build_time = `date \"+%s\"`;" >> version.h
 
@@ -61,3 +59,18 @@ muforth : ${ALLOBJS}
 
 clean :
 	rm -f muforth .gdbinit version.h *.o
+
+## For merging changes in other branches into x86_native
+.if defined (BRANCH)
+
+syncpoint !
+	cvs rtag -r ${BRANCH} -F ${BRANCH}_merged_to_x86_native muforth
+
+do_merge !
+	cvs update -j ${BRANCH}_merged_to_x86_native -j ${BRANCH}
+
+merge ! do_merge syncpoint
+
+.else
+.error You need to define a source BRANCH to merge from.
+.endif
