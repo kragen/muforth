@@ -63,8 +63,6 @@ struct inm initial_forth[] = {
     { "'number,", mu_push_tick_number_comma },
     { "h", mu_push_h },
     { "r", mu_push_r },
-    { "cell", mu_push_cell_size },
-    { "cell-bits", mu_push_cell_bits },
     { "s0", mu_push_s0 },
     { "sp", mu_push_sp },
     { "catch", mu_catch },
@@ -141,13 +139,20 @@ struct inm initial_forth[] = {
     { "sp@", mu_sp_fetch },
     { "sp!", mu_sp_store },
     { "cmove", mu_cmove },
+    { "cells", mu_cells },
+    { "cell/", mu_cell_slash },
+
+    /* time.c */
     { "local-time", mu_local_time },
     { "utc", mu_global_time },
     { "clock", mu_push_clock },
+
 #ifdef __FreeBSD__
+    /* pci.c */
     { "pci", mu_pci_open },
     { "pci@", mu_pci_read },
 #endif
+
     /* tty.c */
     { "get-termios", mu_get_termios },
     { "set-termios", mu_set_termios },

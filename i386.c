@@ -28,16 +28,6 @@
 static code_t *pcd_last_call;
 static code_t *pcd_jump_dest = 0;
 
-void mu_push_cell_size()
-{
-    PUSH(CELL_BYTES);
-}
-
-void mu_push_cell_bits()
-{
-    PUSH(CELL_BITS);
-}
-
 static void mu_compile_offset()
 {
     code_t *dest = (code_t *) POP;

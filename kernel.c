@@ -65,6 +65,22 @@ void mu_two_star() { TOP = TOP << 1; }
 void mu_two_slash() { TOP = TOP >> 1; }
 void mu_two_slash_unsigned() { TOP = ((unsigned) TOP) >> 1; }
 
+/*
+ * C, or at least gcc, is sooooo fucking retarded! I cannot define "cell/"
+ * the way I want, because gcc (on x86 at least) compiles /= by a power of
+ * two of a _signed_ integer as an _un_signed_ shift! What gives!
+ *
+ * So I have to go to extra effort and circumvent my tool, which, instead of
+ * helping me get my job done, is in the way. Sigh.
+ *
+ * Actually, C is even more retarded than I thought. I was going to check
+ * the sizeof(cell) and set SH_CELL accordingly...but I can't do
+ * "environmental queries" in the preprocessor! So the user gets to do this
+ * by hand! Hooray for automation!
+*/
+void mu_cells(void)      { TOP <<= SH_CELL; }
+void mu_cell_slash(void) { TOP >>= SH_CELL; }
+
 void mu_shift_left()
 {
     cell_t sh = POP;

@@ -30,35 +30,64 @@
 VERSION=	0.01
 
 CFLAGS=		-O2 -Wall -fomit-frame-pointer
+#CFLAGS=		-g -Wall -fomit-frame-pointer -DDEBUG -DBEING_DEFINED
 LDFLAGS=
 
 # If any of these files changes, make a new version.h
 VERSOBJS=	kernel.o interpret.o compile.o dict.o file.o \
 		error.o time.o pci.o tty.o select.o sort.o \
-		i386.o i386_lib.o # buf.o
+		i386.o i386_lib.o
 
-ALLOBJS = ${VERSOBJS} muforth.o
+ALLOBJS=	${VERSOBJS} muforth.o
+DEPFILES=	Makefile muforth.h env.h
 
 .PHONY: all clean
 
-all : muforth .gdbinit
+all : public.h muforth
 
-${ALLOBJS} : Makefile muforth.h
+${ALLOBJS} : ${DEPFILES}
 
 muforth.o : version.h
+
+public.h : ${ALLOBJS:S/.o/.ph/}
+	(echo "/* This file is automagically generated. Do not edit! */"; \
+	cat ${.ALLSRC}) > ${.TARGET}
+
+.SUFFIXES : .ph
+
+.c.ph : Makefile
+	@echo Making ${.TARGET}
+	@(echo "/* ${.IMPSRC} */"; \
+	sed -E -n \
+		-e '/^static /d' \
+		-e 's/^([a-z]+ \**[a-z_0-9]+)\((void)?\).*$$/\1(void);/p' \
+		-e 's/^(pw [a-z_0-9]+).*;$$/extern \1;/p' \
+		${.IMPSRC}; \
+	echo) > ${.TARGET}
+
+.s.ph : Makefile
+	@echo Making ${.TARGET}
+	@(echo "/* ${.IMPSRC} */"; \
+	sed -E -n \
+		-e 's/^[ 	]+\.globl[ 	]+([a-z_0-9]+).*/void \1(void);/p' \
+		${.IMPSRC}; \
+	echo) > ${.TARGET}
+
+env.h : envtest
+	./envtest > ${.TARGET}
 
 version.h : Makefile ${VERSOBJS}
 	echo "#define VERSION \"${VERSION}\"" > version.h
 	echo "time_t build_time = `date \"+%s\"`;" >> version.h
 
-muforth : ${ALLOBJS}
+muforth : ${ALLOBJS} ${DEPFILES}
 	${CC} ${LDFLAGS} -o $@ ${ALLOBJS} ${LIBS}
 
-.gdbinit :
-	ln -s gdb-i386.init .gdbinit
+.c.asm :
+	${CC} ${CFLAGS} -S -o ${.TARGET} -c ${.IMPSRC}
 
 clean :
-	rm -f muforth .gdbinit version.h *.o
+	rm -f muforth version.h public.h *.o *.asm *.ph
 
 ## For merging changes in other branches into x86_native
 .if defined (BRANCH)
