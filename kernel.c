@@ -43,11 +43,6 @@ void mu_shift_right_unsigned()
     (unsigned) TOP >>= sh;
 }
 
-void mu_cfetch()
-{
-    TOP = *(uint8_t *) TOP;
-}
-
 void mu_store()
 {
     cell_t *p = (cell_t *) TOP;

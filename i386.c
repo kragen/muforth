@@ -42,6 +42,8 @@
 #define MOV_IR(r,w)	(0xb0 + (8 * (w)) + (r))	/* move imm to reg */
 #define MOV_A		0xa0	/* move eax/ax/al to/from offset (opt) */
 #define MOV		0x88	/* move register,memory (generic) */
+#define MOVZX		0xb6	/* move register,memory (generic, zero-ext);
+				   requires EXT prefix */
 
 #define LEA		0x8d
 
@@ -89,6 +91,8 @@
 #define R_D	2
 
 #define R_SP	4
+#define R_BP	5	/* when used with MD_OFFSET_NONE, means no base reg +
+			   immediate 32 bit offset */
 #define R_SIB	R_SP	/* when used as base reg in mod_rm, sp means 
 			   that an sib byte follows */
 
@@ -118,52 +122,126 @@
 #define DEC_M	0xfe
 #define R_DEC	1
 
-static code_t *pcd_last_call;
+static code_t *pcd_last_call = 0;
+static code_t *pcd_last_lit = 0;
+static code_t *pcd_last_pop = 0;
 static code_t *pcd_jump_dest = 0;
 
-static void compile_add_sp(int n)
+static int vsp = 0;		/* virtual stack pointer */
+static int sp_valid;		/* sp is in sp register */
+static int top_valid;		/* top has been loaded */
+
+static void validate_sp()
 {
-    /*
-     * Changed from add to lea so it won't affect flags. Makes writing my
-     * conditional test code much easier. ;-)
-     */
-    C1(LEA);				/* leal n(,%ebx),%ebx */
-    C1(MOD_RM(MD_OFFSET_8, R_B, R_B));
-#if 0
-    C1(IMM_SX | W32);			/* addl $n,%ebx */
-    C1(MOD_RM(MD_REG, R_ADD, R_B));
-#endif
-    C1(n);
+    if (!sp_valid)
+    {
+	C1(MOV | TO_R | W32);			/* movl sp, %ebx */
+	C1(MOD_RM(MD_OFFSET_NONE, R_B, R_BP));	/* offset32, no base! */
+	C4(&sp);
+
+	sp_valid = 1;
+	vsp = 0;
+    }
 }
-    
-/*
- * Code to manage moving from top register to stack contents pointed to by
- * ebx register.
- */
-static void compile_pop_top(cell_t offset)
+
+static void invalidate_sp()
 {
-    C1(MOV | TO_R | W32);			/* movl offset(%ebx), %eax */
-    if (offset == 0)
+    if (sp_valid)
+    {
+	empty_top();
+	normalize_sp();
+
+	C1(MOV | W32);				/* movl %ebx, sp */
+	C1(MOD_RM(MD_OFFSET_NONE, R_B, R_BP));	/* offset32, no base! */
+	C4(&sp);
+
+	sp_valid = 0;
+    }
+}
+
+static void add_sp(int n)
+{
+    validate_sp();
+    vsp += n;
+}
+
+static void normalize_sp(int n)
+{
+    if (vsp != 0)
+    {
+	/*
+	 * Changed from add to lea so it won't affect flags. Makes writing my
+	 * conditional test code much easier. ;-)
+	 */
+	C1(LEA);				/* leal n(,%ebx),%ebx */
+	C1(MOD_RM(MD_OFFSET_8, R_B, R_B));
+ #if 0
+	C1(IMM_SX | W32);			/* addl $n,%ebx */
+	C1(MOD_RM(MD_REG, R_ADD, R_B));
+ #endif
+	C1(vsp);
+
+	vsp = 0;
+    }
+}
+
+static void compile_stack_offset()
+{
+    if (vsp == 0)
+    {
 	C1(MOD_RM(MD_OFFSET_NONE, R_A, R_B));
+    }
     else
     {
 	C1(MOD_RM(MD_OFFSET_8, R_A, R_B));
-	C1(offset);
+	C1(vsp);
     }
-    compile_add_sp(offset + 4);
 }
 
-static void compile_put_top(cell_t offset)
+/*
+ * Code to manage moving from top register to stack contents pointed to by
+ * ebx register.
+ *
+ * If we're popping with an offset of 0, remember this so we can optimize
+ * pops followed by pushes.
+ */
+static void compile_load_top()
 {
-    C1(MOV | W32);				/* movl %eax,-4(%ebx) */
-    C1(MOD_RM(MD_OFFSET_8, R_A, R_B));
-    C1(-4);
+    validate_sp();
+
+    C1(MOV | TO_R | W32);			/* movl vsp(%ebx), %eax */
+    compile_stack_offset();
 }
 
-static void compile_push_top()
+static void compile_store_top()
 {
-    compile_put_top(-4);
-    compile_add_sp(-4);
+    validate_sp();
+
+    C1(MOV | W32);				/* movl %eax,vsp(%ebx) */
+    compile_stack_offset();
+}
+
+static void fill_top()
+{
+    if (!top_valid)
+    {
+	compile_load_top();
+	add_sp(4);
+    }
+    else if (top_state == TOP_LITERAL)
+	compile_literal_load(R_A, literal_value);
+
+    top_state = TOP_VALID;
+}
+
+static void empty_top()
+{
+    if (top_valid)
+    {
+	add_sp(-4);
+	compile_store_top();
+	top_valid = 0;
+    }
 }
 
 /*
@@ -196,9 +274,9 @@ static void compile_push_top()
  * 5 bytes; this code takes 3 + 3 + 2 = 8 bytes, but doesn't appear very often
  * - it's only in defining words.
  */
-static void compile_split_literal_load(cell_t lit)
+static void compile_literal_load(int reg, cell_t lit)
 {
-    C1(MOV_IR(R_D, W32));	/* movl $literal, %edx */
+    C1(MOV_IR(reg, W32));	/* movl $literal, %reg */
     C4(lit);
 }
 
@@ -214,17 +292,24 @@ void mu_compile_split_literal_push()
     C1(MOD_RM(MD_REG, R_D, R_A));		/* movl %edx, %eax */
 }
 
-static void compile_inline_literal(cell_t lit)
+static void deferred_inline_literal(cell_t lit)
 {
-    compile_push_top();
+    empty_top();
+    literal_value = lit;
+    top_state = TOP_LITERAL;
+}
+
+static void compile_inline_literal()
+{
     C1(MOV_IR(R_A, W32));	/* movl $literal, %eax */
-    C4(lit);
+    C4(literal_value);
+    top_state = TOP_VALID;
 }
 
 void mu_compile_inline_literal()
 {
     /* pop literal value from stack and compile */
-    compile_inline_literal(POP);
+    deferred_inline_literal(POP);
 }
 
 void mu_fetch_literal_value()
@@ -235,27 +320,28 @@ void mu_fetch_literal_value()
     TOP = *p;			/* fetch the value that is loaded */
 }
 
-#ifdef NOTYET
-void mu_was_literal()
+static int last_was_literal(cell_t *lit)
 {
-    if (pcd - 5 == pcd_last_call && *pcd_last_call == 0xe8
-	&& (pcd + *(uint32_t *)(pcd - 4) == (char *) &push_literal))
+    if (pcd - 5 == pcd_last_lit)
     {
-	/* last code compiled was a call to push_literal; back up,
-           uncompile the call, and push the literal value onto the stack */
-	/* XXX */
+	*lit = *(cell_t *)(pcd - 4);	/* fetch value */
+	pcd -= 5;			/* uncompile load */
+	pcd_last_lit = 0;
+	return 1;
     }
+    return 0;
 }
-#endif
 
 void mu_compile_drop()
 {
-    compile_pop_top(0);
+    add_sp(4);
+    top_state = TOP_EMPTY;
 }
 
 void mu_compile_2drop()
 {
-    compile_pop_top(4);
+    add_sp(8);
+    top_state = TOP_EMPTY;
 }
 
 
@@ -266,6 +352,7 @@ static void compile_offset(code_t *dest)
 
 static void compile_call(code_t *dest)
 {
+    normalize_sp();
     pcd_last_call = pcd;
     C1(CALL);			/* call near, 32 bit offset */
     compile_offset(dest);
@@ -293,6 +380,34 @@ void i386_execute()
 	(*(void (*)()) POP)();
 }
 
+static void compile_pre_cee()
+{
+    /*
+     * movl  %eax,-4(%ebx)
+     * addl  $-4,%ebx
+     * movl  %ebx,sp
+     */
+
+    empty_top();
+    invalidate_sp();
+
+    if (sp_state == SP_IN_REG)
+    {
+	C1(MOV | W32);				/* movl %ebx, sp */
+	C1(MOD_RM(MD_OFFSET_NONE, R_B, R_BP));	/* offset32, no base! */
+	C4(&sp);
+    }
+}
+
+static void compile_post_cee()
+{
+    /*
+     * movl  sp,%ebx
+     * movl  (%ebx),%eax
+     * addl  $4,%ebx
+     */
+}
+
 void mu_compile_call()
 {
     code_t *dest = (code_t *) POP;
@@ -301,8 +416,9 @@ void mu_compile_call()
 	compile_call(dest);
     else
     {
-	compile_split_literal_load((cell_t)dest);
-	compile_call((code_t *)i386_into_cee);
+	compile_pre_cee();
+	compile_call(dest);
+	compile_post_cee();
     }
 }
 
@@ -470,17 +586,40 @@ void mu_compile_next()
 /*
  * Now code to compile basic kernel operations!
  */
-static void compile_2op(uint8_t op)
+static void compile_2op(uint8_t r_op)
 {
-    C1(OP_R(op) | TO_R | W32);			/* <op>  (%ebx),%eax */
-    C1(MOD_RM(MD_OFFSET_NONE, R_A, R_B));
-    compile_add_sp(4);
+    fill_top();
+
+    if (literal_deferred)
+    {
+	if (literal_value + 128 < 256)		/* fits in 8 bits */
+	{
+	    C1(IMM_SX | W32);
+	    C1(MOD_RM(MD_REG, r_op, R_A));
+	    C1(literal_value);
+	}
+	else
+	{
+	    C1(IMM | W32);
+	    C1(MOD_RM(MD_REG, r_op, R_A));
+	    C4(literal_value);
+	}
+	literal_deferred = 0;
+    }
+    else
+    {
+	C1(OP_R(r_op) | TO_R | W32);		/* <op>  (%ebx),%eax */
+	C1(MOD_RM(MD_OFFSET_NONE, R_A, R_B));
+	add_sp(4);
+    }
 }
 
-static void compile_1op(uint8_t op_prefix, uint8_t op)
+static void compile_1op(uint8_t op_prefix, uint8_t r_op)
 {
+    fill_top();
+
     C1(op_prefix | W32);
-    C1(MOD_RM(MD_REG, op, R_A));
+    C1(MOD_RM(MD_REG, r_op, R_A));
 }
 
 void mu_add()
@@ -530,17 +669,36 @@ void mu_two_slash_unsigned()
 
 void mu_fetch()
 {
+    fill_top();
+
     C1(MOV | TO_R | W32);
+    C1(MOD_RM(MD_OFFSET_NONE, R_A, R_A));
+}
+
+void mu_cfetch()
+{
+    fill_top();
+
+    C1(EXT);
+    C1(MOVZX | TO_R);
     C1(MOD_RM(MD_OFFSET_NONE, R_A, R_A));
 }
 
 void mu_dupe()
 {
+    if (top_state == TOP_LITERAL)
+    {
+	compile_push_top();
+	compile_literal_load();
+    }
+    else if (top_state == TOP_EMPTY)
+	compile_pop_top();
+	
     compile_push_top();
 }
 
 void mu_nip()
 {
-    compile_add_sp(4);
+    add_sp(4);
 }
 

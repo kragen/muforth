@@ -184,6 +184,21 @@ void mu_compile_2pop_from_r(void);
 void mu_compile_copy_from_r(void);
 void mu_compile_qfor(void);
 void mu_compile_next(void);
+void mu_add(void);
+void mu_and(void);
+void mu_or(void);
+void mu_xor(void);
+void mu_negate(void);
+void mu_invert(void);
+void mu_two_star(void);
+void mu_two_slash(void);
+void mu_two_slash_unsigned(void);
+void mu_fetch(void);
+void mu_cfetch(void);
+void mu_dupe(void);
+void mu_nip(void);
+void mu_drop(void);
+void mu_two_drop(void);
 
 /* i386_lib.s */
 /*
@@ -247,29 +262,14 @@ void init_dict(void);
 /* buf.c */
 
 /* kernel.c */
-void mu_add(void);
-void mu_and(void);
-void mu_or(void);
-void mu_xor(void);
-void mu_negate(void);
-void mu_invert(void);
-void mu_two_star(void);
-void mu_two_slash(void);
-void mu_two_slash_unsigned(void);
 void mu_shift_left(void);
 void mu_shift_right(void);
 void mu_shift_right_unsigned(void);
-void mu_fetch(void);
-void mu_cfetch(void);
 void mu_store(void);
 void mu_cstore(void);
 void mu_plus_store(void);
-void mu_drop(void);
-void mu_two_drop(void);
 void mu_rot(void);
 void mu_minus_rot(void);
-void mu_dupe(void);
-void mu_nip(void);
 void mu_swap(void);
 void mu_over(void);
 void mu_tuck(void);
@@ -283,8 +283,8 @@ void mu_less(void);
 void mu_sp_fetch(void);
 void mu_sp_store(void);
 void mu_cmove(void);
-void mu_dplus_gcc(void);
-void mu_dnegate_gcc(void);
+void mu_dplus(void);
+void mu_dnegate(void);
 
 /* time.c */
 void mu_local_time(void);

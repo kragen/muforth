@@ -75,9 +75,11 @@
   2. compile data structures: variables, constants, create/does words;
 
   3. read and write numbers - an interesting exercise since muforth starts
-     life _not_ even knowing only the constant 1!
+     life _not_ even knowing the constant 1!
 
   4. read and write strings.
+
+  5. miscellaneous utility words - for writing times and dates, e.g.
 
   Once these are complete we will have a useful Forth for doing real work.
 
@@ -152,11 +154,13 @@ forth
 : invert  invert ;
 : negate  negate ;
 : @  @ ;
+: c@  c@ ;
 : 2*  2* ;
 : 2/  2/ ;
 : u2/  u2/ ;
 : dup  dup ;
 : nip  nip ;
+: drop  drop ;
 : 2drop  2drop ;
 
 ( We don't even have any constants yet! So we make the easiest one first...)
@@ -165,15 +169,19 @@ forth
 : 1   [ -1 negate ] ;
 : 2   [ 1 2* ] ;
 
-: 1+   1 + ;  ( these are common)
-: 1-  -1 + ;
+compiler
+: 1+   1 \c + ;  ( these are common)
+: 1-  -1 \c + ;
+forth
 
 ( XXX: This is architecture-specific.) 
 : cell   [ 2 2* ] ;    ( 32 bit machine)
-: cell+  cell + ;
-: cell-  [ cell negate ] + ;
-: cells  2* 2* ;
-: cell/  2/ 2/ ;
+compiler
+: cell+  [ cell ] \c + ;
+: cell-  [ cell negate ] \c + ;
+: cells  \c 2*  \c 2* ;
+: cell/  \c 2/  \c 2/ ;
+forth
 
 : bl  [ 2 2* 2* 2* 2* ] ;  ( space character)
 
@@ -214,7 +222,7 @@ forth
 : |vector|  (s n a mask)  rot and  swap  vector  ;
 
 ( Compiler nuts and bolts.)
-: aligned  [ cell 1- ] +  [ cell negate ] and ;
+: aligned  [ cell 1 - ] +  [ cell negate ] and ;
 : here   h @ ;  ( h points to the first free byte in code space)
 : ram    r @ ;  ( r points to the first free byte in data space)
 : allot  aligned  r +! ;  ( keeps ram space cell-aligned)
@@ -709,7 +717,7 @@ defer ?radix
   would be set to 4. Then `0' pushes 0 on the stack but doesn't affect dpl,
   so Forth tries to convert it, and BOOM.)
 
-: (number)  (s a u - d)  zzz
+: (number)  (s a u - d)
    radix @ push   ['] fancy-number  catch   pop radix !  throw  ;
 ( always reset the radix, even in case of error)
 
