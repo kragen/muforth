@@ -42,7 +42,7 @@ ALLOBJS = ${VERSOBJS} muforth.o
 
 .PHONY: all clean
 
-all : muforth
+all : muforth .gdbinit
 
 ${ALLOBJS} : Makefile muforth.h
 
