@@ -2,7 +2,7 @@
 : forth        .forth. definitions ;
 : compiler  .compiler. definitions ;
 
-: literal  load-literal push-literal ;
+: literal  inline-literal ;
 
 : ]   literal -] ;
 : char	 token  drop  c@ ;
@@ -143,6 +143,22 @@ forth
 : u+  (s a b c - a+c b)  rot +  swap ;  ( "under-plus")
 : v+  (s x1 y1 x2 y2 - x1+x2 y1+y2)  push u+ pop + ;  ( add 2-vectors)
 
+( Since several common words are now .compiler. "macros", we need to
+  generate "standalone" versions that can be used interactively.)
+: +  + ;
+: and  and ;
+: or  or ;
+: xor  xor ;
+: invert  invert ;
+: negate  negate ;
+: @  @ ;
+: 2*  2* ;
+: 2/  2/ ;
+: u2/  u2/ ;
+: dup  dup ;
+: nip  nip ;
+: 2drop  2drop ;
+
 ( We don't even have any constants yet! So we make the easiest one first...)
 : 0   [ dup dup xor ] ;
 : -1  [ 0 invert ] ;
@@ -178,8 +194,8 @@ forth
 : urshift  u>> ;
 
 ( 2003-sep-30. I've decided that "push ;" is too implementation-specific.)
-: @execute  @ [  ( FALLS THRU)
-: execute  push ;  ( make an alias for it, once and for all)
+( : execute   ;  ( make an alias for it, once and for all)
+: @execute  @ execute ;
 
 ( Jumping through vectors of calls.)
 ( too 386-specific
@@ -274,14 +290,16 @@ forth
 ( Defining words are next. Right now we only `know' how to make `colon'
   definitions. We need some structural help first.)
 
-( Some notes on the newer, smarter ] . I wanted to gain a
-  little of the clarity that Chuck Moore's colorForth gains by getting rid
-  of "[ <calculate something here> ] literal". He replaces the whole
-  construct with colored words that are executed or compiled depending on
-  their color, but with a little added twist: words that are executed [of
-  "execute" color] create what I call a "pending literal" that will be
-  compiled just _before_ the next word that is compiled [of "compile"
-  color].
+( Some notes on the newer, smarter ] . I wanted to gain a little of the
+  clarity that Chuck Moore's colorForth gains by getting rid of
+
+    [ <calculate something here> ] literal
+
+  He replaces the whole construct with colored words that are executed or
+  compiled depending on their color, but with a little added twist: words
+  that are executed [of "execute" color] create what I call a "pending
+  literal" that will be compiled just _before_ the next word that is
+  compiled [of "compile" color].
 
   Even if we don't have color, we do still have [ and ] and can use them to
   achieve the same end. [ creates a pending literal and ] compiles it.
@@ -612,7 +630,7 @@ decimal
    over if ( still chars to process)  swap push  over c@  xor if
    ( no match)  pop 0 ^ then
    ( match)  pop 1 -1 v+  -1 ^  then
-   ( end of input)  drop  shunt  ( -1 throw) ;  ( XXX use throw!)
+   ( end of input)  drop zzz  shunt  ( -1 throw) ;  ( XXX use throw!)
 
 : ?sign  char - punct  if  -1 ^  then  0 ;
 
@@ -678,7 +696,7 @@ defer ?radix
    =if  for  @digit?  while  *digit 1+ next  0 ^  then
                                 drop  pop  then  ;
 
-: fancy-number  (s a u - d)  ( was -: )
+: fancy-number  (s a u - d)  ( was -: )  zzz
    2push  0 0  2pop  ?radix  ?sign push  dpl on
    begin  >number  =while ( still chars)  ?dot  repeat
    2drop  pop  if dnegate then  ;
@@ -691,7 +709,7 @@ defer ?radix
   would be set to 4. Then `0' pushes 0 on the stack but doesn't affect dpl,
   so Forth tries to convert it, and BOOM.)
 
-: (number)  (s a u - d)
+: (number)  (s a u - d)  zzz
    radix @ push   ['] fancy-number  catch   pop radix !  throw  ;
 ( always reset the radix, even in case of error)
 

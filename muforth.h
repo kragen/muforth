@@ -61,7 +61,11 @@ typedef uint8_t   code_t;
 #define STK(n)  	(sp[n])
 #define TOP		STK(0)
 #define DROP(n)		(sp += n)
+#ifdef __i386__
+#define EXECUTE		i386_execute()
+#else
 #define EXECUTE		(*(void (*)()) POP)()
+#endif
 
 #ifdef DEBUG
 #include <stdio.h>
@@ -156,8 +160,8 @@ void mu_readable_q();
 void mu_read_carefully(void);  /* XXX: temporary */
 void mu_write_carefully(void); /* XXX: temporary */
 
-
 /* i386.c */
+void i386_execute(void);
 void mu_compile_call(void);
 void mu_resolve(void);
 void mu_compile_jump(void);
@@ -165,8 +169,9 @@ void mu_compile_entry(void);
 void mu_compile_exit(void);
 void mu_compile_drop(void);
 void mu_compile_2drop(void);
-void mu_compile_literal_load(void);
-void mu_compile_literal_push(void);
+void mu_compile_inline_literal(void);
+void mu_compile_split_literal_load(void);
+void mu_compile_split_literal_push(void);
 void mu_fetch_literal_value(void);
 void mu_compile_destructive_zbranch();
 void mu_compile_nondestructive_zbranch();
@@ -180,13 +185,22 @@ void mu_compile_copy_from_r(void);
 void mu_compile_qfor(void);
 void mu_compile_next(void);
 
-/* i386.s */
-void mu_push_literal(void);
+/* i386_lib.s */
+/*
+void i386_lib_start(void);
+void i386_lib_end(void);
+extern code_t *i386_into_cee;
+*/
+extern code_t *i386_lib_start;
+extern code_t *i386_lib_end;
+void i386_into_cee(void);
+void i386_into_forth(void);
 void mu_dplus(void);
 void mu_dnegate(void);
 void mu_um_star(void);
 void mu_m_star(void);
 void mu_um_slash_mod(void);
+void mu_sm_slash_rem(void);
 void mu_fm_slash_mod(void);
 void mu_jump(void);
 

@@ -20,77 +20,87 @@
 ##  limitations under the License.)
 
 
-## Note: mu_push_literal isn't really a function. DO NOT call it directly
-## from "normal" Forth or C code! It is intended to be called by compiled
-## code that is trying to do part of does> or part of a literal push. On
-## entry edx contains the value we want to push.
-	
-	.globl	mu_push_literal
-mu_push_literal:
-	movl	sp,%eax
-	sub	$4,sp
-	movl	%edx,-4(%eax)	# value to push is in edx
+## Veneer code so we can make safe calls to C code without breaking our
+## register convention. edx has address of routine to call.
+	.globl	i386_into_cee
+i386_into_cee:
+	movl	%eax,-4(%ebx)
+	addl	$-4,%ebx
+	movl	%ebx,sp		# C expects sp to be stack pointer
+	call	*%edx
+	movl	sp,%ebx
+	movl	(%ebx),%eax	# our register setup for Forth
+	addl	$4,%ebx
 	ret
 
-## After struggling with gcc for a long time, I gave up and wrote these
-## routines in assembler.
+## Veneer code so we can make safe calls from C code into Forth code without
+## breaking our register convention. sp[0] has address of routine to call.
+	.globl	i386_into_forth
+i386_into_forth:
+	pushl	%ebx		# callee saved!
+	movl	sp,%ebx
+	movl	(%ebx),%edx	# routine address
+	movl	4(%ebx),%eax	# get top for Forth
+	addl	$8,%ebx
+	call	*%edx
+	movl	%eax,-4(%ebx)
+	addl	$-4,%ebx
+	movl	%ebx,sp		# restore for C
+	popl	%ebx		# callee saved!
+	ret
+	
+## Mark the limits of these words so we can recognize them as non-C Forth.
+	.globl	i386_lib_start
+i386_lib_start:
 
 	.globl	mu_dplus
 mu_dplus:
-	movl	sp,%eax
-	movl	4(%eax),%edx
-	addl	%edx,12(%eax)
-	movl	0(%eax),%edx
-	adcl	%edx,8(%eax)
-	addl	$8,sp
+	movl	(%ebx),%edx	# lo
+	addl	8(%ebx),%edx	# sum_lo
+	movl	%edx,8(%ebx)
+	adcl	4(%ebx),%eax	# sum_hi
+	addl	$8,%ebx
 	ret
 
 	.globl	mu_dnegate
 mu_dnegate:
-	movl	sp,%eax
-	negl	(%eax)
-	negl	4(%eax)
-	sbbl	$0,(%eax)
+	negl	%eax
+	negl	4(%ebx)
+	sbbl	$0,(%ebx)
 	ret
 
 	.globl	mu_um_star
 mu_um_star:
-	movl	sp,%ecx
-	movl	(%ecx),%eax
-	mull	4(%ecx)
-	movl	%edx,(%ecx)
-	movl	%eax,4(%ecx)
+	movl	(%ebx),%eax
+	mull	4(%ebx)
+	movl	%eax,4(%ebx)	# prod low
+	movl	%edx,%eax	# prod high
 	ret
 
 	.globl	mu_m_star
 mu_m_star:
-	movl	sp,%ecx
-	movl	(%ecx),%eax
-	imull	4(%ecx)
-	movl	%edx,(%ecx)
-	movl	%eax,4(%ecx)
+	movl	(%ebx),%eax
+	imull	4(%ebx)
+	movl	%eax,4(%ebx)	# prod low
+	movl	%edx,%eax	# prod high
 	ret
 
 	.globl	mu_um_slash_mod
 mu_um_slash_mod:
-	movl	sp,%ecx
-	movl	4(%ecx),%edx	# dividend hi
-	movl	8(%ecx),%eax	# dividend lo
-	divl	(%ecx)		# divisor on stack
-	movl	%edx,8(%ecx)	# remainder
-	movl	%eax,4(%ecx)	# quotient, on top
-	addl	$4,sp
+	movl	%eax,%edx	# dividend hi
+	movl	4(%ebx),%eax	# dividend lo
+	divl	(%ebx)		# divisor on stack
+	movl	%edx,4(%ebx)	# remainder ; quotient in eax (top)
+	addl	$4,%ebx
 	ret
 
 	.globl	mu_sm_slash_rem		# symmetric division, for comparison
 mu_sm_slash_rem:
-	movl	sp,%ecx
-	movl	4(%ecx),%edx	# hi word at lower address
-	movl	8(%ecx),%eax	# dividend = edx:eax, divisor on stack
-	idivl	(%ecx)		# now rem = edx, quotient = eax
-	movl	%edx,8(%ecx)	# leave remainder and
-	movl	%eax,4(%ecx)	# quotient on stack, quotient on top
-	addl	$4,sp
+	movl	%eax,%edx	# dividend hi
+	movl	4(%ebx),%eax	# dividend lo
+	idivl	(%ebx)		# divisor on stack
+	movl	%edx,4(%ebx)	# remainder ; quotient in eax (top)
+	addl	$4,%ebx
 	ret
 
 ##  IDIV is symmetric.  To fix it (to make it _FLOOR_) we have to
@@ -116,34 +126,25 @@ mu_sm_slash_rem:
 
 	.globl	mu_fm_slash_mod		# floored division!
 mu_fm_slash_mod:
-	pushl	%ebx		# callee saved!
-	movl	sp,%ecx
-	movl	4(%ecx),%edx	# hi word at lower address
-	movl	8(%ecx),%eax	# dividend = edx:eax, divisor on stack
-	idivl	(%ecx)		# now modulus = edx, quotient = eax
-	movl	(%ecx),%ebx
-	xorl	4(%ecx),%ebx	## <0 if d'dend & d'sor are opposite signs
+	movl	%eax,%edx	# hi word of dividend in eax; move to edx
+	movl	4(%ebx),%eax	# dividend = edx:eax, divisor on stack
+	idivl	(%ebx)		# now modulus = edx, quotient = eax
+	movl	(%ebx),%ecx
+	xorl	4(%ebx),%ecx	## <0 if d'dend & d'sor are opposite signs
 	jns	1f		# do nothing if same sign
 	orl	%edx,%edx
 	je	1f		# do nothing if mod == 0
 	decl	%eax		# otherwise quot = quot - 1
-	addl	(%ecx),%edx	#            mod = mod + divisor
-1:	movl	%edx,8(%ecx)	# leave modulus and
-	movl	%eax,4(%ecx)	# quotient on stack, quotient on top
-	addl	$4,sp
-	popl	%ebx		# callee saved!
+	addl	(%ebx),%edx	#            mod = mod + divisor
+1:	movl	%edx,4(%ebx)	# leave modulus and quotient, quotient on top
+	addl	$4,%ebx
 	ret
-
 
 ## for jumping thru a following "vector" of compiled calls, each 5 bytes long
 	.globl	mu_jump
 mu_jump:
-	movl	sp,%eax
-	addl	$4,sp
-
 	# edx = vector = return address; eax = index
 	popl	%edx
-	movl	(%eax),%eax
 
 	# edx points just _past_ the call/jmp instruction
 	# we're interested in
@@ -152,5 +153,11 @@ mu_jump:
 
 	# ... so back up and get the offset, and add it to edx
 	addl	-4(%edx),%edx
-	jmp	*%edx		# then go there!
+	movl	(%ebx),%eax	# reload top
+	addl	$4,%ebx
+	jmp	*%edx		# and go!
+
+## Mark the limits of these words so we can recognize them as non-C Forth.
+	.globl	i386_lib_end
+i386_lib_end:
 

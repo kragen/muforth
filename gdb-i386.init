@@ -1,5 +1,5 @@
 define regs
-disp/4xw sp
+disp/8xw sp
 disp/a $esp
 disp/a $esi
 disp/a $edi
@@ -17,6 +17,7 @@ end
 regs
 
 break mu_zzz
+break die
 
 #set args -d debug -f arm.mu4 -f ARM/module.mu4
 

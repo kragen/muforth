@@ -29,7 +29,7 @@
  
 VERSION = 0.01
 
-CFLAGS=-O2 -Wall -fomit-frame-pointer
+CFLAGS=-O2 -g -Wall -fomit-frame-pointer -DBEING_DEFINED
 DBGCFLAGS=-O0 -ggdb -Wall
 ASFLAGS=-g
 LDFLAGS=

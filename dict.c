@@ -72,6 +72,7 @@ struct inm initial_forth[] = {
     { "token", mu_token },
     { "parse", mu_parse },
     { "find", mu_find },
+    { "execute", i386_execute },
     { "interpret", mu_interpret },
     { "evaluate", mu_evaluate },
     { "create-file", mu_create_file },
@@ -82,8 +83,9 @@ struct inm initial_forth[] = {
     { "mmap-file", mu_mmap_file },    
     { "load-file", mu_load_file },
     { "readable?", mu_readable_q },
-    { "load-literal", mu_compile_literal_load },
-    { "push-literal", mu_compile_literal_push },
+    { "inline-literal", mu_compile_inline_literal },
+    { "load-literal", mu_compile_split_literal_load },
+    { "push-literal", mu_compile_split_literal_push },
     { "fetch-literal", mu_fetch_literal_value },
     { "compile,", mu_compile_call },
     { "resolve", mu_resolve },
@@ -100,19 +102,10 @@ struct inm initial_forth[] = {
     { "scrabble", mu_scrabble },
     { "nope", mu_nope },
     { "zzz", mu_zzz },
-    { "+", mu_add },
-    { "and", mu_and },
-    { "or", mu_or },
-    { "xor", mu_xor },
-    { "negate", mu_negate },
-    { "invert", mu_invert },
     { "u<", mu_uless },
     { "0<", mu_zless },
     { "0=", mu_zequal },
     { "<", mu_less },
-    { "2*", mu_two_star },
-    { "2/", mu_two_slash },
-    { "u2/", mu_two_slash_unsigned },
     { "<<", mu_shift_left },
     { ">>", mu_shift_right },
     { "u>>", mu_shift_right_unsigned },
@@ -123,15 +116,12 @@ struct inm initial_forth[] = {
     { "um/mod", mu_um_slash_mod },
     { "fm/mod", mu_fm_slash_mod },
     { "jump", mu_jump },
-    { "@", mu_fetch },
     { "c@", mu_cfetch },
     { "!", mu_store },
     { "c!", mu_cstore },
     { "+!", mu_plus_store },
     { "rot", mu_rot },
     { "-rot", mu_minus_rot },
-    { "dup", mu_dupe },
-    { "nip", mu_nip },
     { "swap", mu_swap },
     { "over", mu_over },
     { "tuck", mu_tuck },
@@ -185,6 +175,18 @@ struct inm initial_compiler[] = {
     { "2pop", mu_compile_2pop_from_r },
     { "r@", mu_compile_copy_from_r },
     { "shunt", mu_compile_shunt },
+    { "+", mu_add },
+    { "and", mu_and },
+    { "or", mu_or },
+    { "xor", mu_xor },
+    { "negate", mu_negate },
+    { "invert", mu_invert },
+    { "@", mu_fetch },
+    { "dup", mu_dupe },
+    { "nip", mu_nip },
+    { "2*", mu_two_star },
+    { "2/", mu_two_slash },
+    { "u2/", mu_two_slash_unsigned },
     { NULL, NULL }
 };
 
@@ -242,9 +244,9 @@ static void compile_dict_entry(
     memcpy(pde->name, name, length);	/* copy name string */
     pnm = (uint8_t *)ALIGNED(pde->name + length);
 
-#if defined(LIST_DICT_ENTRIES)
-    printf("%*s: %p\n", length, pde->name, pcode);
-#endif /* LIST_DICT_ENTRIES */
+#if defined(BEING_DEFINED)
+    printf("%p %p %*s\n", ppde, pcode, length, pde->name);
+#endif /* BEING_DEFINED */
 }
 
 /* called from Forth */
