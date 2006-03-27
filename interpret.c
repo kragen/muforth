@@ -48,49 +48,8 @@ static ssize_t first;		/* goes from -start to 0 */
 
 struct string parsed;		/* for errors */
 
-#if 0
-/* Parse whitespace-delimited tokens */
-void mu_token_old()
+static void mu_return_token(ssize_t last, int trailing)
 {
-    ssize_t last;
-    int trailing;
-
-    /* regardless of the outcome, we return (start, length) */
-    DROP(-2);
-
-    if (first == 0)
-    {
-	STK(1) = TOP = 0;
-	return;
-    }
-	
-    /* Skip leading whitespace */
-    for (;;)
-    {
-	if (!isspace(source.end[first])) break;
-	if (++first == 0)
-	{
-	    STK(1) = TOP = 0;
-	    return;
-	}
-    }
-
-    /*
-     * Now scan for trailing delimiter and consume it,
-     * unless we run out of input text first.
-     */
-    last = first;
-    trailing = 1;
-    for (;;)
-    {
-	if (isspace(source.end[last])) break;
-	if (++last == 0)
-	{
-	    trailing = 0;
-	    break;
-	}
-    }
-
     /* Get address and length of the token */
     parsed.data = source.end + first;
     parsed.length = last - first;
@@ -98,146 +57,62 @@ void mu_token_old()
     /* Account for characters processed, return token */
     first = last + trailing;
 
+    DROP(-1);    /* make room for result */
     STK(1) = (cell_t) parsed.data;
     TOP = parsed.length;
-}
-#endif
 
-void mu_token()
+#ifdef DEBUG_TOKEN
+    write(2, parsed.data, parsed.length);
+    write(2, "\n", 1);
+#endif
+}
+
+void mu_token()  /* -- start len */
 {
     ssize_t last;
-    int trailing;
+
+    DROP(-1);   /* we'll be setting TOP when we're done */
 
     /* Skip leading whitespace */
-    for (;;)
-    {
-	if (first == 0)
-	    break;
-
-	if (!isspace(source.end[first]))
-	    break;
-
-	first++;
-    }
+    for (; first != 0 && isspace(source.end[first]); first++)
+        ;
 
     /*
-     * Now scan for trailing delimiter and consume it,
-     * unless we run out of input text first.
+     * Scan for trailing whitespace and consume it, unless we run out of
+     * input text first.
      */
-    last = first;
-    trailing = 1;
-    for (;;)
-    {
-	if (last == 0)
-	{
-	    trailing = 0;
-	    break;
-	}
-	if (isspace(source.end[last]))
-	    break;
+    for (last = first; last != 0; last++)
+        if (isspace(source.end[last]))
+        {
+            /* found trailing whitespace; consume it */
+            mu_return_token(last, 1);
+            return;
+        }
 
-	last++;
-    }
-
-    /* Get address and length of the token */
-    parsed.data = source.end + first;
-    parsed.length = last - first;
-
-    /* Account for characters processed, return token */
-    first = last + trailing;
-
-    STK(-1) = (cell_t) parsed.data;
-    STK(-2) = parsed.length;
-    DROP(-2);
+    /* ran out of text; don't consume trailing */
+    mu_return_token(last, 0);
 }
 
-#if 0
-/* Parse token using arbitrary delimiter; do not skip leading delimiters */
-void mu_parse_old()
+void mu_parse()  /* delim -- start len */
 {
     ssize_t last;
-    int trailing;
-    int c;
 
-    c = TOP;
-
-    /* regardless of the outcome, we return (start, length) */
-    DROP(-1);
-
-    if (first == 0)
-    {
-	STK(1) = TOP = 0;
-	return;
-    }
-	
-    last = first;
+    /* The first character of unseen input is the first character of token. */
 
     /*
-     * Now scan for trailing delimiter and consume it,
-     * unless we run out of input text first.
+     * Scan for trailing delimiter and consume it, unless we run out of
+     * input text first.
      */
-    trailing = 1;
-    for (;;)
-    {
-	if (c == source.end[last]) break;
-	if (++last == 0)
-	{
-	    trailing = 0;
-	    break;
-	}
-    }
+    for (last = first; last != 0; last++)
+        if (TOP == source.end[last])
+        {
+            /* found trailing delimiter; consume it */
+            mu_return_token(last, 1);
+            return;
+        }
 
-    /* Get address and length of the token */
-    parsed.data = source.end + first;
-    parsed.length = last - first;
-
-    /* Account for characters processed, return token */
-    first = last + trailing;
-
-    STK(1) = (cell_t) parsed.data;
-    TOP = parsed.length;
-}
-#endif
-
-void mu_parse()
-{
-    ssize_t last;
-    int trailing;
-    int c;
-
-    c = TOP;
-
-    /* The first character of unseen input is the first character of token */
-    last = first;
-
-    /*
-     * Scan for trailing delimiter and consume it,
-     * unless we run out of input text first.
-     */
-    trailing = 1;
-    for (;;)
-    {
-	if (last == 0)
-	{
-	    trailing = 0;
-	    break;
-	}
-	if (c == source.end[last])
-	    break;
-
-	++last;
-    }
-
-    /* Get address and length of the token */
-    parsed.data = source.end + first;
-    parsed.length = last - first;
-
-    /* Account for characters processed, return token */
-    first = last + trailing;
-
-    TOP = (cell_t) parsed.data;
-    STK(-1) = parsed.length;
-    DROP(-1);
+    /* ran out of text; don't consume trailing */
+    mu_return_token(last, 0);
 }
 
 /*
