@@ -67,6 +67,30 @@ void mu_push_compiler_chain()
     PUSH(&compiler_chain);
 }
 
+/*
+ * Trying a fundamental change to the text interpreter. Instead of only
+ * searching the .forth. chain, now both the interpreter and compiler
+ * search first "current" (the chain we are compiling into) and only if
+ * not found there AND current not equal to .forth. do we then also
+ * search .forth.
+ *
+ * This should make creating assemblers and target compilers easier, since
+ * we won't have to be quite as explicit about "quoting" - eg with \a -
+ * words defined in current that we want to refer to (ie, compile).
+ *
+ * Here's how it works: search current. If found, or if current == .forth.
+ * return the result of the search. Otherwise, search .forth. .
+ */
+void mu_context_find()
+{
+    PUSH(current_chain);
+    mu_find();
+    if (TOP || current_chain == &forth_chain) return;
+    DROP(1);
+    mu_push_forth_chain();
+    mu_find();
+}
+
 /* NOTE: Though "latest" is a variable, we never want to store into it,
  * so push its _value_ rather than its _address_.
  */

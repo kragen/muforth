@@ -1,4 +1,4 @@
-assembler
+machine
 
 decimal
 
@@ -30,7 +30,7 @@ decimal
 
 // ////////////////////////////////////////////////////////////
 
-outside-loop
+__outside__
 
 forward
 
@@ -67,11 +67,11 @@ code emit
            then
       halfbit  halfbit  ( delay one bit time)
    top lsr  bitcnt dec
-   0= until  drop ret  ;c
+   0= until  <drop> ret  ;c
 
 ( Wait for char, return its ascii value)
 code key
-   dup  ( push top)
+   <dup>  ( push top)
    9 bitcnt ldi  ( bit count - 8 data, 1 stop)
    begin   rx serpin sbic   again
    ( Got low - start bit! So delay 0.5 bit time, then enter loop)
@@ -84,20 +84,19 @@ code key
    repeat  ret  ;c
 
 code chars
-   begin  top inc  "7f top andi  dup  emit  again  ;c
+   begin  top inc  "7f top andi  <dup>  emit  again  ;c
 
 code echo
    begin  key  emit  again  ;c
 
 code crlf
-   dup  13 top ldi  emit  dup  10 top ldi  emit  ret  ;c
+   <dup>  13 top ldi  emit  <dup>  10 top ldi  emit  ret  ;c
 
 code hello
-   8 18 ldi  42 top ldi  begin  dup emit  18 dec  0= until  crlf  ret  ;c
+   8 18 ldi  42 top ldi  begin  <dup> emit  18 dec  0= until  crlf  ret  ;c
 
 resolve
 label reset
-   ( getting the wrong dup!! fuck)
    ( Set up R stack)
    r0    temp ldi    SPL temp out
    r0 hi temp ldi    SPH temp out

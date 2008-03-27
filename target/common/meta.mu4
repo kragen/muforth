@@ -43,23 +43,23 @@ outside
 
 
 ( Random useful goodies.)
-: hex      hex  ;
-: decimal  decimal  ;
-: octal    octal  ;
-: .     .  ;
-: u.    u.  ;
-: .s    .s  ;
+: hex      \f hex  ;
+: decimal  \f decimal  ;
+: octal    \f octal  ;
+: .     \f .  ;
+: u.    \f u.  ;
+: .s    \f .s  ;
 
-: comment  comment ;
+: comment  \f comment ;
 : (     \f (  ;
 : char  \f char  ;
 : ."    \f ."  ;
 : "     \f "  ;
 
-: cr    cr  ;
-: file[   file[  ;
-: ]file   ]file  ;
-: ld     ld  ;
+: cr    \f cr  ;
+: file[   \f file[  ;
+: ]file   \f ]file  ;
+: ld     \f ld  ;
 
 forth
 

@@ -97,16 +97,7 @@ forth
 : chain'  token'  huh?  ;
 : \chain  chain'  compile,  ;
 
-( 28-apr-2000. Do we ever -really- want to search anything other than .forth.?)
-: '   .forth.  chain'  ;
-( : '   current @  chain'  ;  ( XXX)
-
 compiler
-( XXX: should this and ' do the same thing?)
-( : [']  .forth. chain' literal ;)
-: [']  ' literal ;
-
-( XXX: is this useful? Here? Maybe in a target compiler...)
 : \f     .forth. \chain ;
 : \c  .compiler. \chain ;  ( until we have \ ; we need this for "if")
 
@@ -116,7 +107,16 @@ compiler
 : (w   \f ( ;  (w word comment)
 forth
 
+( 2008-mar-26. Since we're now searching current and .forth. , during both
+  compilation and interpretation, it seemed to make sense to make ' and [']
+  work the same way.)
 
+: '   token  context-find  huh?  ;
+
+compiler
+: [']    ' literal ;
+
+forth
 ( Some useful tidbits.)
 : -   negate + ;
 : u+  (s a b c - a+c b)  rot +  swap ;  ( "under-plus")
@@ -219,7 +219,7 @@ token control_structures.mu4 scrabble load-file
 
 compiler
 : \   .compiler. token'  if compile, ^ then
-         .forth. find  huh?  literal  ['] compile,  compile, ;
+         context-find  huh?  literal  ['] compile,  compile, ;
 
 forth
 
@@ -476,15 +476,20 @@ compiler
 forth
 
 ( Redefine, and then set the forth "consume".)
+
+( Added searching of "current" chain - if different from .forth. - before
+  searching .forth. . This is a pretty fundamental change, but not a lot of
+  existing code changes.)
+
 -:   ( interpret one token)
-      .forth. find  if  execute ^  then  number ;     state @  !
+      context-find  if  execute ^  then  number ;     state @  !
 
 ( Now set the compiler "consumer". To get access to the value of state at
   compile time, we turn on the compiler, but don't compile anything!)
 
 -:   ( compile one token)
    .compiler. find  if  execute ^  then
-      .forth. find  if  compile, ^  then  number literal ;
+      context-find  if  compile, ^  then  number literal ;
                                       -]  'compiler-consume [  !
 
 

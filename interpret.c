@@ -128,11 +128,16 @@ void mu_huh_q()
 
 void mu_execute() { EXECUTE; }
 
+/* These two consume functions will be replaced by code in startup.mu4 once
+ * we have number parsing code. Since we're now considering both "current
+ * @" and .forth. to be the context that should be searched when we're
+ * searching "forth" we need to define a word that searches both.
+ */
+
 /* The interpreter's "consume" function. */
 void _mu__lbracket()
 {
-    mu_push_forth_chain();
-    mu_find();
+    mu_context_find();
     if (POP)
     {
         EXECUTE;
@@ -151,8 +156,7 @@ void _mu__rbracket()
         EXECUTE;
         return;
     }
-    mu_push_forth_chain();
-    mu_find();
+    mu_context_find();
     if (POP)
     {
         mu_compile_comma();

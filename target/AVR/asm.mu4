@@ -76,8 +76,6 @@ comment
 : Ah  ( addr op - lo hibits)
    over #16 u>>  dup 3e and 3 <<  swap 1 and  or  or ;
 
-: ljmp  ( a32)    constant does>  ( a32 op)  Ah op, op, ;
-
 ( 2opw - pppp pppp dddd ssss. d,r >> 1)
 : movw  ( Rs Rd -)  u2/ 4 <<  swap u2/ or  0100 or op, ;
 
@@ -102,13 +100,6 @@ comment
 : checkrange  ( offset range - offset | throw)
    inrange?  if ^ then   error" relative jump out of range" ;
 
-( Called when |here points _at_ rjmp/call, not past it, so we fix up
-  the offset.)
-: _rjmp  ( dest op)  swap  |here >offset 1-  1000 checkrange  or op, ;
-
-( XXX: fix to generate long call/jmp when necessary)
-: rjmp  ( dest)  constant does>  ( dest op)  _rjmp ;
-
 assembler
 
 ( Once again, issues of using the manufacturer's mnemonics - which are
@@ -129,8 +120,8 @@ assembler
 2400 2op eor
 2800 2op or
 2c00 2op mov
-: tst  dup \a and ;  ( tst == and Rd,Rd)
-: clr  dup \a eor ;  ( clr == eor Rd,Rd)
+: tst  dup  and ;  ( tst == and Rd,Rd)
+: clr  dup  eor ;  ( clr == eor Rd,Rd)
 
 ( bi - byte immed. pppp kkkk dddd kkkk - r16-31)
 forth
@@ -156,12 +147,15 @@ assembler
 9406 1op lsr
 9407 1op ror
 940a 1op dec
-: lsl  dup \a add ;  ( lsl == add Rd,Rd)
-: rol  dup \a adc ;  ( rol == adc Rd,Rd)
+: lsl  dup  add ;  ( lsl == add Rd,Rd)
+: rol  dup  adc ;  ( rol == adc Rd,Rd)
 
 ( long jump and call - pppp pppk kkkk pppk, kkkk kkkk kkkk kkkk)
-940c ljmp ljmp
-940e ljmp lcall
+forth
+: ljump  ( a32)    constant does>  ( a32 op)  Ah op, op, ;
+assembler
+940c ljump ljmp   ( definer can't have the same name - collision!)
+940e ljump lcall
 
 ( STATUS bit set & clear)
 forth
@@ -184,8 +178,8 @@ assembler
 8200 ld/st st  ( Rd - bits)
 
 ( Alternate syntax)
-: <-  \a ld ;
-: ->  \a st ;
+: <-   ld ;
+: ->   st ;
 
 ( suffixes - these do the action)
 0000 ix_off  ,z   ( op+Rd u6)
@@ -202,15 +196,15 @@ assembler
 100e ix      -x
 100f ix     stk  ( for push and pop!)
 
-: push  ( Rd)  \a st \a stk ;
-: pop   ( Rd)  \a ld \a stk ;
+: push  ( Rd)   st  stk ;
+: pop   ( Rd)   ld  stk ;
 
 1e constant z
 1f constant zh
-: top   \a z ;
-: toph  \a zh ;
-: sp+  \a y+ ;
-: -sp  \a -y ;
+: top    z ;
+: toph   zh ;
+: sp+   y+ ;
+: -sp   -y ;
 
 ( wi - word immed. pppp pppp kkdd kkkk. dd=0..3 -> r24,26,28,30)
 forth
@@ -238,8 +232,16 @@ b000 io in    ( Rd <- io[i])
 b800 io out   ( Rd -> io[i])
 
 ( rel jump and call - pppp kkkk kkkk kkkk)
-c000 rjmp rjmp
-d000 rjmp rcall
+forth
+( Called when |here points _at_ rjmp/call, not past it, so we fix up
+  the offset.)
+: _rjump  ( dest op)  swap  |here >offset 1-  1000 checkrange  or op, ;
+
+( XXX: fix to generate long call/jmp when necessary)
+: rjump  ( dest)  constant does>  ( dest op)  _rjump ;
+assembler
+c000 rjump rjmp
+d000 rjump rcall
 
 ( Load, store, and test bits in registers.)
 forth
@@ -364,10 +366,10 @@ assembler
 6 constant .T
 7 constant .I
 
-: u<  \a .C ;  ( carry set)
-: 0=  \a .Z ;  ( zero  set)
-: 0<  \a .N ;  ( negative set)
-: <   \a .S ;  ( signed bit set; ie N xor V == 1)
+: u<   .C ;  ( carry set)
+: 0=   .Z ;  ( zero  set)
+: 0<   .N ;  ( negative set)
+: <    .S ;  ( signed bit set; ie N xor V == 1)
 
 ( Conditional branches: test status reg bit; branch if set/clear)
 ( branch if bit clear: 1111 01kk kkkk ksss)
@@ -427,65 +429,55 @@ assembler
   Thus we need words to compile forward conditional branches, forward
   unconditional branches, and backwards branches of either kind.)
 
+( Sadly I can't rely on new compiler loop - which searches current as well
+  as .forth. to find words to compile - for the following words, since
+  .compiler. will still trump the assembler words with the same names. So
+  I still have to rely on \a to get them to compile.)
+
 ( if compiles "branch if bit clr")
 : if      (s bit - src)    cjmp, ;
 : then    (s src)          |here resolve> ;
-: else    (s src1 - src2)  rjmp, swap  \a then ;
+: else    (s src1 - src2)  rjmp, \f swap   \a then ;
 : begin   (s - dest)       |here ;
 : until   (s bit dest -)   \a if  <resolve ;
 : again   (s dest -)       rjmp,  <resolve ;
-: while   (s bit dest - src dest)   \a if  swap ;
-: repeat  (s src dest -)   \a again  \a then ;
+: while   (s bit dest - src dest)    \a if  \f swap ;
+: repeat  (s src dest -)    \a again   \a then ;
 
 ( XXX testing)
-: .  . ;
-: .s  .s ;
-: .b  .b ;
+: .  \f . ;
+: .s  \f .s ;
+: .b  \f .b ;
 
 forth
 -:  ."  (assembling)"  ;
--:  .assembler. find  if  execute ^  then
-       .target. find  if  execute ^  then  number ;
-mode asm
+-:    .machine. find  if  execute ^  then
+    .assembler. find  if  execute ^  then  number ;
+mode __asm__
 
 -:  ."  (outside)"  ;
 -:    .outside. find  if  execute ^  then  number ;
-mode outside-loop
-
--:  ."  (assembling a macro)"  ;
--:   .compiler. find  if  execute ^ then
-    .assembler. find  if  compile, ^  then  number literal ;
-mode macro-loop
-
--:  ."  (calculator)"  ;
--:  .assembler. find  if  execute ^  then
-        .forth. find  if  execute ^  then  number ;
-mode deskcalc
+mode __outside__
 
 outside
-: label  |here dup . cr target constant forth  asm ;
-: code   \o label  does>  \a rcall ;
+: _label  |here dup . cr  constant forth  __asm__ ;
+: label  machine  _label ;
+: code   machine   _label  does>   \a rcall ;  ( XXX: should be in target)
 : '   .target. chain' execute ;
 : forward  rjmp, ;
 : resolve  |here resolve> ;
 : host  \ [ ;
 
-compiler
-: <asm   macro-loop ;
-: asm>   -] ;
-forth
-
 assembler
 : (   \f ( ;
-: {    deskcalc ;
-: ;c   outside-loop ;
+: ;c   __outside__ ;
 
 ( macro to pop d stack)
-: drop  <asm  top  ld sp+  toph ld sp+  asm> ;
-: dup   <asm  toph st -sp  top  st -sp  asm> ;
+: <drop>  top  ld sp+  toph ld sp+ ;
+: <dup>   toph st -sp  top  st -sp ;
 
 forth
-: }  asm ;
+: }  __asm__ ;
 
 #]file
 
