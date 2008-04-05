@@ -1,0 +1,6 @@
+
+
+z" avr.img" create-file  ( fd)
+fd-out @  over writes
+'image |# type
+writes  close-file

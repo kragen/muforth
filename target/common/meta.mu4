@@ -35,6 +35,44 @@ compiler
 : \d   ( compile from definer)      .definer. \chain ;
 : \t   ( compile from target)        .target. \chain ;
 
+
+( XXX)
+forth
+defer target-remote
+defer target-compile,
+
+-: error" We're not connected to the target yet." ;  is target-remote
+
+( These are universal!)
+
+( For target-compiling.)
+-:  ."  (outside)"  ;
+-:    .outside. find  if  execute ^  then  number ;
+mode __outside__
+
+( Inside a target definition.)
+-:  ."  (inside)"  ;
+-:     .inside. find  if  execute ^  then
+       .target. find  if  execute target-remote ^  then  number ;
+mode __inside__
+
+( For interacting with a tethered target.)
+-:  ."  (chatting)"  ;
+-:     .target. find  if  execute target-remote ^  then
+      .outside. find  if  execute ^         then  number ;
+mode __chat__
+
+-:  ."  (assembling)"  ;
+-:    .machine. find  if  execute ^  then
+    .assembler. find  if  execute ^  then  number ;
+mode __asm__
+
+-:  ."  (assembling a macro)"  ;
+-:   .compiler. find  if  execute ^   then
+      .machine. find  if  compile, ^  then
+    .assembler. find  if  compile, ^  then  number literal ;
+mode __macro__
+
 forth
 : \   .outside. chain' execute ;  ( escape to meta - find and execute a word)
 
@@ -61,6 +99,8 @@ outside
 : ]file   ]file  ;
 : ld     ld  ;
 
+: __asm__   __asm__ ;
+: __forth__   \c [ ;
 forth
 
 #]file
