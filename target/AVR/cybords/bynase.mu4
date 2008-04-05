@@ -3,6 +3,10 @@
 --  (c) 2006 Ward Cunningham
 --  Released under GPL v2 or higher
 
+decimal
+
+machine
+
 	3 constant pi
 	4  constant po
 
@@ -12,27 +16,43 @@
 	15 constant byseq
 	16 constant bytmp
 
+	17 constant a
+	18 constant b
+	19 constant c
 
-	1 pud << bytmp ldi 	-- disable pullups
+-- Constants for accessing io regs. Note that these are in _data_ space;
+-- the asm will subtract "20 to put them into io space when used with iobit
+-- opcodes.
+
+"35 constant mcucr
+6 constant pud
+
+"16 constant pinb
+"17 constant ddrb
+"18 constant portb
+
+__asm__
+
+	1 pud \f << bytmp ldi 	-- disable pullups
 	bytmp mcucr out
 
-	byend rjmp              -- skip? but then skip can't \f swap
+skip    -- forward to then
 
 --  operate input/output
 begin
-skip  -- forward to "then"
+skip  \f swap           -- forward to "then"
 label byop
 	byseq inc
 0= until
 	byseq inc
 	byacc byin mov
 	byacc clr
-then
+then  ;c
 
 macro movb
 	byseq bst
 	bytmp bld
-;m
+;m  __asm__
 	0 7 movb
 	1 6 movb
 	2 5 movb
@@ -77,8 +97,11 @@ begin
 0= until
 	ret
 
+then
 
-label byend
+;c
+
+__forth__
 
 
 -- ---------------------- end bynase driver -----------------------
