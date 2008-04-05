@@ -912,13 +912,21 @@ forth
 defer canonical  ( XXX: is this obsolete?)
 -:  forth  \ [ ;  is canonical
 
+( If we run out of input, typing will return a string of length zero; we
+  now test for this condition and exit muFORTH. This makes it usable for
+  batch mode operation.)
+
 : quit
-   begin  cr  <stdin  >stdout  typing interpret  >stderr  prompt  again  [
-   ( infinite loop, until error... )
+   begin  cr  <stdin  >stdout  typing =while
+          interpret  >stderr  prompt  repeat  bye  [
+   ( infinite loop, until input exhausted or error... )
 
 ( 2004-jun-26. error now expects a cell-length-prefixed compiled string.)
 : error  parsed type space  count type  ( cr) ;
 : carefully  catch  =if  error  sp!  ^  then  drop ;
+
+( Loads a file inside of a catch frame which exits on error.)
+: -F   token _string  ['] load-file catch  =if  error bye  then  drop ;
 
 ( XXX: difference betw error and warning, so that, eg, "isn't defined"
   doesn't clear the stack.)
