@@ -1,0 +1,85 @@
+
+-- ---------------------- bynase driver ---------------------------
+--  (c) 2006 Ward Cunningham
+--  Released under GPL v2 or higher
+
+	3 constant pi
+	4  constant po
+
+	12 constant byacc
+	13 constant byin
+	14 constant byout
+	15 constant byseq
+	16 constant bytmp
+
+
+	1 pud << bytmp ldi 	-- disable pullups
+	bytmp mcucr out
+
+	byend rjmp              -- skip? but then skip can't \f swap
+
+--  operate input/output
+begin
+skip  -- forward to "then"
+label byop
+	byseq inc
+0= until
+	byseq inc
+	byacc byin mov
+	byacc clr
+then
+
+macro movb
+	byseq bst
+	bytmp bld
+;m
+	0 7 movb
+	1 6 movb
+	2 5 movb
+	3 4 movb
+	4 3 movb
+	5 2 movb
+	6 1 movb
+	7 0 movb
+	pi pinb	sbic            -- sample input, count 1's
+	byacc inc
+	bytmp byout cp          -- sample output
+u< if
+	po portb cbi
+else
+	po portb sbi
+then
+
+-- drive po for 6 cycles
+	po ddrb sbi
+	nop2
+	nop2
+	nop2
+	po ddrb cbi
+	ret
+
+
+--  delay for about 100 microseconds
+
+label bydle
+	80 bytmp ldi
+
+
+--  delay for about a*10/8 microseconds
+
+begin
+	nop2
+	nop2
+	nop2
+	nop2
+	nop
+	bytmp dec
+0= until
+	ret
+
+
+label byend
+
+
+-- ---------------------- end bynase driver -----------------------
+

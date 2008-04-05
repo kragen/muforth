@@ -1,0 +1,121 @@
+
+
+.include "tn45def.inc"
+
+-- 	This program generates morse code on keyout (active low)
+-- 	in response to switch closures on keyin which is also 
+-- 	echoed to keyout. Keying speed is controled by pi.
+--         
+--              ATtiny45
+--              +--v--+
+--     rst pb5 -|     |- vcc
+--      pi pb3 -|     |- pb2 sck
+--      po pb4 -|     |- pb1 miso keyin -----O--->O--- gnd
+--         gnd -|     |- pb0 mosi keyout --+-UUUUUU--- vcc
+--              +-----+                    +---|<----- gnd
+--                8Mhz
+-- 
+-- 	(c) 2006 Ward Cunningham
+-- 	Released under GPL v2 or higher
+
+
+	.set keyout =pb0
+	.set keyin =pb1
+
+	.def a =r17
+	.def b =r18
+	.def c =r19
+
+	.def char =r20
+
+skip  -- reset vector
+
+.include "bynase2.inc"	--  uses r12-r16
+
+table ascii
+	," now is the time for all good men to come to the aid of their country    "
+	," the quick brown fox jumped over the lazy dogs back   "
+	0 c,
+
+table morse
+	%01100000 c, %10001000 c, %10101000 c, %10010000 c,
+	%01000000 c, %00101000 c, %11010000 c, %00001000 c,
+	%00100000 c, %01111000 c, %10110000 c, %01001000 c,
+	%11100000 c, %10100000 c, %11110000 c, %01101000 c,
+	%11011000 c, %01010000 c, %00010000 c, %11000000 c,
+	%00110000 c, %00011000 c, %01110000 c, %10011000 c,
+	%10111000 c, %11001000 c,
+
+code tick
+	byin c mov	--  use pi
+	c com
+	c lsr
+	-40 c subi
+begin
+	byop rcall	--  get pi
+	7 b ldi
+begin begin
+	a dec
+0= until
+	b dec
+0= until
+	c dec
+0= until
+	ret
+
+code code
+begin
+	char lsl
+0= if
+	tick rcall	--  letter space
+	tick rcall
+	ret
+then
+	keyout portb cbi
+.C if
+	tick rcall	--  dah
+	tick rcall
+then
+	tick rcall	--  dit
+	keyout portb sbi
+	tick rcall	--  element space
+again
+
+code send
+	char zl mov
+	'a' zl subi
+0< not if               -- daf: should be u< ??
+	low(-(morse*2)) zl subi
+	0 zh ldi
+	high(-(morse*2)) zh sbci
+	char ld pmz	--  3 ticks for fetch
+	code rjmp
+then
+ 	%10000000 char ldi
+ 	code rjmp       -- no longer fall-thru into code!
+
+code text
+begin
+	char ld pmz+
+	0 char cpi
+0= not while
+	zl push
+	zh push
+	send rcall
+	zh pop
+	zl pop
+repeat
+	ret
+
+then    -- jump here from reset vector
+label reset
+	$9e a ldi
+	a osccal out
+	keyout ddrb sbi
+
+begin
+	low(ascii*2) zl ldi
+	high(ascii*2) zh ldi
+	text rcall
+again
+
