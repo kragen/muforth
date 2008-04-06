@@ -9,6 +9,11 @@ cr  " AVR memory image " file[#
   to 64k address space. Since the program space is word-addressed, this
   means 32k words.)
 
+( Let's make this less ARM/x86 specific.)
+variable |cell
+defer |c@
+defer |@
+
 64 Ki constant #image  ( this is as big as it can get!)
 #image buffer 'image
 : |+  'image + ;
