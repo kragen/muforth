@@ -1,7 +1,2 @@
 
-
-
-z" avr.hex" create-file  ( fd)
-fd-out @  over writes
 'image 0 |# chunks end
-writes  close-file
