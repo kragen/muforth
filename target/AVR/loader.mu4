@@ -5,7 +5,9 @@
 
 ( Load AVR build environment)
 
-ld target/common/infra.mu4      ( basic infrastructure)
+( Don't load _all_ the common bits since we don't want to talk to serial
+  tty in this case!)
+ld target/common/meta.mu4      ( basic infrastructure)
 ld target/AVR/memory.mu4        ( basic target memory management)
 ld lib/intel-hex.mu4
 -- ld target/AVR/terminal.mu4
