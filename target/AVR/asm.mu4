@@ -5,7 +5,7 @@
 
 ( Assembler for AVR 8 bit microcontroller.)
 
-cr " AVR assembler " file[#
+" AVR assembler " file[#
 
 ( Debug)
 : _     char _ hold ;
@@ -24,8 +24,8 @@ comment
 hex
 
 forth
--- : op,  |, ;
- : op,  ( compile)  dup |,  ( and print)  .b  cr ;
+: op,  |, ;
+-- : op,  ( compile)  dup |,  ( and print)  .b  cr ;
 
 comment
 ==========================================================================
@@ -445,7 +445,7 @@ assembler
 
 : \f   .forth. chain' execute ;
 
-: label  |here dup . cr machine constant forth  __asm__ ;
+: label  |here ( dup . cr) machine constant forth  __asm__ ;
 outside
 : code   \a label  does>  \a rcall ;
 : '   .target. chain' execute ;

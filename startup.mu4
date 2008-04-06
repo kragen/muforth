@@ -816,8 +816,8 @@ variable csp  ( what does this stand for? `check stack pointer'?)
          =if  . ." stack depth change: "  hex  .s cr  ^  then  drop  ;
 
 ( Bracket the contents of a file and check for stack depth change.)
-: file[  (s a u)   >stderr  ." (( "  type  >stdout  !csp  ;
-: ]file            >stderr  ." )) "        >stdout  ?csp  ;
+: file[  (s a u)   >stderr  cr  ." (( "  type  >stdout  !csp  ;
+: ]file            >stderr      ." )) "        >stdout  ?csp  ;
 
 ( For counting the size of a loaded file.)
 : file[#   (s a u)  file[  here  ;
@@ -927,6 +927,11 @@ defer canonical  ( XXX: is this obsolete?)
 
 ( Loads a file inside of a catch frame which exits on error.)
 : -F   token _string  ['] load-file catch  =if  error bye  then  drop ;
+
+( Sometimes we want to interpret from stdin _while_ we're still reading
+  command line arguments, and, like -F, punt and exit if anything throws
+  and error. This word lets us do that.)
+( XXX: what should it be called?)
 
 ( XXX: difference betw error and warning, so that, eg, "isn't defined"
   doesn't clear the stack.)
